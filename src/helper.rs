@@ -1,10 +1,6 @@
 use aidoku::{
-	alloc::{format, String, Vec},
-	imports::{
-		defaults::defaults_get,
-		error::Result,
-		net::Request,
-	},
+	alloc::{String, Vec, format},
+	imports::{defaults::defaults_get, error::Result, net::Request},
 };
 
 pub const BASE_URL: &str = "https://m.comic.naver.com";
@@ -32,7 +28,7 @@ pub fn get_title_id(url: &str) -> String {
 		let after = &url[pos + 8..];
 		let id_str = after.split('&').next().unwrap_or(after);
 		if url.contains("bestChallenge") {
-			format!("{}-best", id_str)
+			format!("{id_str}-best")
 		} else {
 			String::from(id_str)
 		}
@@ -60,24 +56,18 @@ pub fn get_chapter_id(url: &str) -> String {
 /// Returns full list URL for a manga
 pub fn get_manga_url(manga_id: &str) -> String {
 	if let Some(clean_id) = manga_id.strip_suffix("-best") {
-		format!("{}/bestChallenge/list?titleId={}", BASE_URL, clean_id)
+		format!("{BASE_URL}/bestChallenge/list?titleId={clean_id}")
 	} else {
-		format!("{}/webtoon/list?titleId={}", BASE_URL, manga_id)
+		format!("{BASE_URL}/webtoon/list?titleId={manga_id}")
 	}
 }
 
 /// Returns full viewer URL for a chapter
 pub fn get_chapter_url(chapter_id: &str, manga_id: &str) -> String {
 	if let Some(clean_id) = manga_id.strip_suffix("-best") {
-		format!(
-			"{}/bestChallenge/detail?titleId={}&no={}",
-			BASE_URL, clean_id, chapter_id
-		)
+		format!("{BASE_URL}/bestChallenge/detail?titleId={clean_id}&no={chapter_id}")
 	} else {
-		format!(
-			"{}/webtoon/detail?titleId={}&no={}",
-			BASE_URL, manga_id, chapter_id
-		)
+		format!("{BASE_URL}/webtoon/detail?titleId={manga_id}&no={chapter_id}")
 	}
 }
 
@@ -109,16 +99,18 @@ pub fn parse_korean_date(date_str: &str) -> Option<i64> {
 	let parts: Vec<&str> = trimmed.split('.').collect();
 	if parts.len() == 3 {
 		let raw_year: i64 = parts[0].parse().ok()?;
-		let year: i64 = if raw_year < 100 { 2000 + raw_year } else { raw_year };
+		let year: i64 = if raw_year < 100 {
+			2000 + raw_year
+		} else {
+			raw_year
+		};
 		let month: i64 = parts[1].parse().ok()?;
 		let day: i64 = parts[2].parse().ok()?;
 
 		let mut days = (year - 1970) * 365 + (year - 1969) / 4;
 		let days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-		for m in 0..(month - 1) as usize {
-			if m < 12 {
-				days += days_in_month[m];
-			}
+		for &d in days_in_month.iter().take((month - 1) as usize) {
+			days += d;
 		}
 		if month > 2 && (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) {
 			days += 1;

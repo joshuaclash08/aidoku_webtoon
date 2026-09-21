@@ -1,7 +1,7 @@
 use aidoku::{
-	alloc::String,
-	imports::defaults::{defaults_get, defaults_set, DefaultValue},
 	HashMap, Result,
+	alloc::String,
+	imports::defaults::{DefaultValue, defaults_get, defaults_set},
 };
 
 const COOKIE_KEY: &str = "naver_cookies";

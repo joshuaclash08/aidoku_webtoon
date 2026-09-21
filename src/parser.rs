@@ -1,10 +1,10 @@
 use aidoku::{
-	alloc::{format, vec, String, Vec},
+	Chapter, ContentRating, DeepLinkResult, FilterValue, Listing, Manga, MangaPageResult,
+	MangaStatus, Page, PageContent, PageContext, Viewer,
+	alloc::{String, Vec, format, vec},
 	helpers::uri::encode_uri_component,
 	imports::error::{AidokuError, Result},
 	imports::net::Request,
-	Chapter, ContentRating, DeepLinkResult, FilterValue, Listing, Manga, MangaPageResult,
-	MangaStatus, Page, PageContent, PageContext, Viewer,
 };
 
 use crate::helper::*;
@@ -21,9 +21,15 @@ fn parse_manga_cards(html: &aidoku::imports::html::Document) -> Vec<Manga> {
 				continue;
 			}
 
-			let mut title = node.select_first("strong").and_then(|e| e.text()).unwrap_or_default();
+			let mut title = node
+				.select_first("strong")
+				.and_then(|e| e.text())
+				.unwrap_or_default();
 			if title.is_empty() {
-				title = node.select_first(".title").and_then(|e| e.text()).unwrap_or_default();
+				title = node
+					.select_first(".title")
+					.and_then(|e| e.text())
+					.unwrap_or_default();
 			}
 			let cover = node.select_first("img").and_then(|e| e.attr("src"));
 			let author = node.select_first(".desc, .author").and_then(|e| e.text());
@@ -31,7 +37,7 @@ fn parse_manga_cards(html: &aidoku::imports::html::Document) -> Vec<Manga> {
 			let full_url = if href.starts_with("http") {
 				href
 			} else {
-				format!("{}{}", BASE_URL, href)
+				format!("{BASE_URL}{href}")
 			};
 
 			let authors = author.map(|a| vec![a]);
@@ -52,7 +58,7 @@ fn parse_manga_cards(html: &aidoku::imports::html::Document) -> Vec<Manga> {
 
 /// Helper to parse weekday list (mon, tue, wed, thu, fri, sat, sun)
 fn parse_weekday_list(week: &str) -> Result<MangaPageResult> {
-	let url = format!("{}/webtoon/weekday?week={}", BASE_URL, week);
+	let url = format!("{BASE_URL}/webtoon/weekday?week={week}");
 	let html = request(&url)?.html()?;
 	let entries = parse_manga_cards(&html);
 
@@ -64,7 +70,7 @@ fn parse_weekday_list(week: &str) -> Result<MangaPageResult> {
 
 /// Helper to parse finished webtoons with pagination
 fn parse_finish_list(page: i32) -> Result<MangaPageResult> {
-	let url = format!("{}/webtoon/finish?page={}&sort=UPDATE", BASE_URL, page);
+	let url = format!("{BASE_URL}/webtoon/finish?page={page}&sort=UPDATE");
 	let html = request(&url)?.html()?;
 	let entries = parse_manga_cards(&html);
 
@@ -89,10 +95,7 @@ fn parse_best_challenge_list(page: i32) -> Result<MangaPageResult> {
 		return Ok(MangaPageResult::default());
 	}
 
-	let url = format!(
-		"{}/bestChallenge/genre?genre=ALL&sort=VIEW&page={}",
-		BASE_URL, page
-	);
+	let url = format!("{BASE_URL}/bestChallenge/genre?genre=ALL&sort=VIEW&page={page}");
 	let html = request(&url)?.html()?;
 	let entries = parse_manga_cards(&html);
 
@@ -120,7 +123,7 @@ pub fn parse_search_manga_list(
 	if let Some(ref q) = query {
 		if !q.trim().is_empty() {
 			let encoded = encode_uri_component(q.trim());
-			let url = format!("{}/search/result?keyword={}", BASE_URL, encoded);
+			let url = format!("{BASE_URL}/search/result?keyword={encoded}");
 			let html = request(&url)?.html()?;
 			let entries = parse_manga_cards(&html);
 
@@ -161,7 +164,8 @@ pub fn parse_manga_details(manga_id: &str, mut manga: Manga) -> Result<Manga> {
 		Err(e) => return Err(e.into()),
 	};
 
-	let is_login_page = html.select_first("title")
+	let is_login_page = html
+		.select_first("title")
 		.and_then(|t| t.text())
 		.map(|s| s.contains("NAVER 로그인") || s.contains("로그인"))
 		.unwrap_or(false)
@@ -183,7 +187,10 @@ pub fn parse_manga_details(manga_id: &str, mut manga: Manga) -> Result<Manga> {
 	let title = html
 		.select_first("meta[property=\"og:title\"]")
 		.and_then(|e| e.attr("content"))
-		.or_else(|| html.select_first(".info_area .title, .title_area strong").and_then(|e| e.text()));
+		.or_else(|| {
+			html.select_first(".info_area .title, .title_area strong")
+				.and_then(|e| e.text())
+		});
 	if let Some(t) = title {
 		manga.title = t;
 	}
@@ -258,15 +265,9 @@ pub fn parse_chapter_list(manga_id: &str) -> Result<Vec<Chapter>> {
 
 	loop {
 		let url = if let Some(clean_id) = manga_id.strip_suffix("-best") {
-			format!(
-				"{}/bestChallenge/list?titleId={}&sortOrder=DESC&page={}",
-				BASE_URL, clean_id, page
-			)
+			format!("{BASE_URL}/bestChallenge/list?titleId={clean_id}&sortOrder=DESC&page={page}")
 		} else {
-			format!(
-				"{}/webtoon/list?titleId={}&sortOrder=DESC&page={}",
-				BASE_URL, manga_id, page
-			)
+			format!("{BASE_URL}/webtoon/list?titleId={manga_id}&sortOrder=DESC&page={page}")
 		};
 
 		let req = match request(&url) {
@@ -279,7 +280,8 @@ pub fn parse_chapter_list(manga_id: &str) -> Result<Vec<Chapter>> {
 		};
 
 		// Check for 19+ adult login redirect
-		let is_login_page = html.select_first("title")
+		let is_login_page = html
+			.select_first("title")
 			.and_then(|t| t.text())
 			.map(|s| s.contains("NAVER 로그인") || s.contains("로그인"))
 			.unwrap_or(false)
@@ -334,30 +336,39 @@ pub fn parse_chapter_list(manga_id: &str) -> Result<Vec<Chapter>> {
 					.unwrap_or(false)
 				|| (href == "#" && node.select_first("em.cookie_txt").is_some());
 
-			let mut raw_title = node.select_first(".name").and_then(|e| e.text()).unwrap_or_default();
+			let mut raw_title = node
+				.select_first(".name")
+				.and_then(|e| e.text())
+				.unwrap_or_default();
 			if raw_title.is_empty() {
-				raw_title = node.select_first("strong.title, .title").and_then(|e| e.text()).unwrap_or_default();
+				raw_title = node
+					.select_first("strong.title, .title")
+					.and_then(|e| e.text())
+					.unwrap_or_default();
 			}
 			if raw_title.is_empty() {
-				raw_title = format!("{}화", chapter_id);
+				raw_title = format!("{chapter_id}화");
 			}
 
 			let title = if is_locked {
-				format!("🔒 {}", raw_title)
+				format!("🔒 {raw_title}")
 			} else {
 				raw_title.clone()
 			};
 
 			let fallback_no = chapter_id.parse::<f32>().unwrap_or(-1.0);
 			let chapter_num = extract_chapter_number(&raw_title, fallback_no);
-			let date_text = node.select_first(".date").and_then(|e| e.text()).unwrap_or_default();
+			let date_text = node
+				.select_first(".date")
+				.and_then(|e| e.text())
+				.unwrap_or_default();
 			let date_uploaded = parse_korean_date(&date_text);
 
 			let full_chapter_url = if href.contains("detail?") {
 				if href.starts_with("http") {
 					href
 				} else {
-					format!("{}{}", BASE_URL, href)
+					format!("{BASE_URL}{href}")
 				}
 			} else {
 				get_chapter_url(&chapter_id, manga_id)
@@ -421,7 +432,8 @@ pub fn parse_page_list(manga_id: &str, chapter_id: &str) -> Result<Vec<Page>> {
 	let url = get_chapter_url(chapter_id, manga_id);
 	let html = request(&url)?.html()?;
 
-	let is_login_page = html.select_first("title")
+	let is_login_page = html
+		.select_first("title")
 		.and_then(|t| t.text())
 		.map(|s| s.contains("NAVER 로그인") || s.contains("로그인"))
 		.unwrap_or(false)
@@ -461,7 +473,10 @@ pub fn parse_page_list(manga_id: &str, chapter_id: &str) -> Result<Vec<Page>> {
 			.select_first("body")
 			.and_then(|b| b.html())
 			.unwrap_or_default();
-		if raw_html.contains("유료로 전환된 회차") || raw_html.contains("구매") || raw_html.contains("대여") {
+		if raw_html.contains("유료로 전환된 회차")
+			|| raw_html.contains("구매")
+			|| raw_html.contains("대여")
+		{
 			return Err(AidokuError::message(
 				"구매 또는 대여가 필요한 유료 회차입니다.",
 			));
@@ -496,8 +511,6 @@ pub fn parse_deep_link(url: String) -> Result<Option<DeepLinkResult>> {
 			key: chapter_id,
 		}))
 	} else {
-		Ok(Some(DeepLinkResult::Manga {
-			key: manga_key,
-		}))
+		Ok(Some(DeepLinkResult::Manga { key: manga_key }))
 	}
 }
