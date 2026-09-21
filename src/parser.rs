@@ -169,10 +169,10 @@ pub fn parse_manga_details(manga_id: &str, mut manga: Manga) -> Result<Manga> {
 
 	if is_login_page {
 		manga.content_rating = ContentRating::NSFW;
-		manga.tags = Some(vec![String::from("19세 이상 이용가")]);
+		manga.tags = Some(vec![String::from("성인")]);
 		if manga.description.is_none() {
 			manga.description = Some(String::from(
-				"이 작품은 19세 이상 이용가입니다. 소스 설정(⚙️)에서 [네이버 로그인]을 완료해주세요.",
+				"로그인이 필요한 작품입니다. 소스 설정에서 네이버 로그인을 완료해주세요.",
 			));
 		}
 		manga.url = Some(url);
@@ -289,11 +289,11 @@ pub fn parse_chapter_list(manga_id: &str) -> Result<Vec<Chapter>> {
 		if is_login_page {
 			if !crate::auth::is_logged_in() {
 				return Err(AidokuError::message(
-					"🔒 19세 성인인증 작품입니다. 소스 설정(⚙️)에서 [네이버 로그인]을 완료해주세요.",
+					"로그인이 필요한 작품입니다. 소스 설정에서 네이버 로그인을 완료해주세요.",
 				));
 			} else {
 				return Err(AidokuError::message(
-					"🔒 네이버 로그인 세션이 만료되었습니다. 소스 설정(⚙️)에서 다시 로그인해주세요.",
+					"네이버 로그인 세션이 만료되었습니다. 소스 설정에서 다시 로그인해주세요.",
 				));
 			}
 		}
@@ -397,7 +397,7 @@ pub fn parse_page_list(manga_id: &str, chapter_id: &str) -> Result<Vec<Page>> {
 
 	if is_login_page {
 		return Err(AidokuError::message(
-			"🔒 19세 성인인증이 필요합니다. 소스 설정에서 [네이버 로그인]을 해주세요.",
+			"로그인이 필요한 작품입니다. 소스 설정에서 네이버 로그인을 완료해주세요.",
 		));
 	}
 
@@ -422,6 +422,19 @@ pub fn parse_page_list(manga_id: &str, chapter_id: &str) -> Result<Vec<Page>> {
 				..Default::default()
 			});
 		}
+	}
+
+	if pages.is_empty() {
+		let raw_html = html
+			.select_first("body")
+			.and_then(|b| b.html())
+			.unwrap_or_default();
+		if raw_html.contains("유료로 전환된 회차") || raw_html.contains("구매") || raw_html.contains("대여") {
+			return Err(AidokuError::message(
+				"구매 또는 대여가 필요한 유료 회차입니다.",
+			));
+		}
+		return Err(AidokuError::message("회차 이미지를 불러올 수 없습니다."));
 	}
 
 	Ok(pages)
