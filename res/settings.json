@@ -1,0 +1,15 @@
+[
+	{
+		"type": "group",
+		"title": "설정",
+		"items": [
+			{
+				"type": "switch",
+				"key": "showBestChallenge",
+				"title": "베스트도전 표시",
+				"subtitle": "베스트도전 연재작을 탐색에 포함합니다",
+				"default": true
+			}
+		]
+	}
+]

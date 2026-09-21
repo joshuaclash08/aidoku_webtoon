@@ -1,0 +1,48 @@
+{
+	"info": {
+		"id": "ko.webtoon",
+		"lang": "ko",
+		"name": "webtoonKR",
+		"version": 1,
+		"urls": [
+			"https://comic.naver.com",
+			"https://m.comic.naver.com"
+		],
+		"nsfw": 0
+	},
+	"listings": [
+		{
+			"name": "월요일"
+		},
+		{
+			"name": "화요일"
+		},
+		{
+			"name": "수요일"
+		},
+		{
+			"name": "목요일"
+		},
+		{
+			"name": "금요일"
+		},
+		{
+			"name": "토요일"
+		},
+		{
+			"name": "일요일"
+		},
+		{
+			"name": "완결"
+		},
+		{
+			"name": "베스트도전"
+		},
+		{
+			"name": "인기순"
+		},
+		{
+			"name": "업데이트순"
+		}
+	]
+}
