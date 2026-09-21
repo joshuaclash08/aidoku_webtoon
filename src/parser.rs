@@ -298,42 +298,74 @@ pub fn parse_chapter_list(manga_id: &str) -> Result<Vec<Chapter>> {
 			}
 		}
 
-		let ep_links = match html.select("a[href*=\"detail?\"]") {
-			Some(l) => l,
-			None => break,
+		let ep_items = match html.select("ul.section_episode_list li.item") {
+			Some(items) if !items.is_empty() => items,
+			_ => match html.select("li.item[data-no]") {
+				Some(items) if !items.is_empty() => items,
+				_ => match html.select("a[href*=\"detail?\"]") {
+					Some(items) => items,
+					None => break,
+				},
+			},
 		};
 
 		let mut found_new = false;
-		for node in ep_links {
-			let href = node.attr("href").unwrap_or_default();
-			if !href.contains("detail?") {
-				continue;
+		for node in ep_items {
+			let class_str = node.attr("class").unwrap_or_default();
+			let href = node
+				.attr("href")
+				.or_else(|| node.select_first("a").and_then(|a| a.attr("href")))
+				.unwrap_or_default();
+
+			let mut chapter_id = node.attr("data-no").unwrap_or_default();
+			if chapter_id.is_empty() {
+				chapter_id = get_chapter_id(&href);
 			}
-			let chapter_id = get_chapter_id(&href);
 			if chapter_id.is_empty() || chapters.iter().any(|c| c.key == chapter_id) {
 				continue;
 			}
 			found_new = true;
 
+			let is_locked = class_str.contains("lock")
+				|| node
+					.select_first(".ico_comic .blind")
+					.and_then(|e| e.text())
+					.map(|t| t.contains("유료"))
+					.unwrap_or(false)
+				|| (href == "#" && node.select_first("em.cookie_txt").is_some());
+
 			let mut raw_title = node.select_first(".name").and_then(|e| e.text()).unwrap_or_default();
 			if raw_title.is_empty() {
 				raw_title = node.select_first("strong.title, .title").and_then(|e| e.text()).unwrap_or_default();
 			}
+			if raw_title.is_empty() {
+				raw_title = format!("{}화", chapter_id);
+			}
+
+			let title = if is_locked {
+				format!("🔒 {}", raw_title)
+			} else {
+				raw_title.clone()
+			};
 
 			let fallback_no = chapter_id.parse::<f32>().unwrap_or(-1.0);
 			let chapter_num = extract_chapter_number(&raw_title, fallback_no);
 			let date_text = node.select_first(".date").and_then(|e| e.text()).unwrap_or_default();
 			let date_uploaded = parse_korean_date(&date_text);
 
-			let full_chapter_url = if href.starts_with("http") {
-				href
+			let full_chapter_url = if href.contains("detail?") {
+				if href.starts_with("http") {
+					href
+				} else {
+					format!("{}{}", BASE_URL, href)
+				}
 			} else {
-				format!("{}{}", BASE_URL, href)
+				get_chapter_url(&chapter_id, manga_id)
 			};
 
 			chapters.push(Chapter {
 				key: chapter_id,
-				title: Some(raw_title),
+				title: Some(title),
 				chapter_number: Some(chapter_num),
 				date_uploaded,
 				url: Some(full_chapter_url),

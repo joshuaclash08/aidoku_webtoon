@@ -14,14 +14,14 @@
 	},
 	{
 		"type": "group",
-		"title": "네이버 계정",
+		"title": "네이버 계정 (Beta)",
 		"items": [
 			{
 				"type": "login",
 				"key": "login",
 				"notification": "login",
 				"method": "web",
-				"title": "네이버 로그인",
+				"title": "네이버 로그인 (Beta)",
 				"url": "https://nid.naver.com/nidlogin.login",
 				"refreshes": ["listings"]
 			},
