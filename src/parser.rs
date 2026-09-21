@@ -337,11 +337,14 @@ pub fn parse_chapter_list(manga_id: String) -> Result<Vec<Chapter>> {
 	loop {
 		let url = if let Some(clean_id) = manga_id.strip_suffix("-best") {
 			format!(
-				"{}/bestChallenge/list?titleId={}&page={}",
+				"{}/bestChallenge/list?titleId={}&sortOrder=DESC&page={}",
 				BASE_URL, clean_id, page
 			)
 		} else {
-			format!("{}/webtoon/list?titleId={}&page={}", BASE_URL, manga_id, page)
+			format!(
+				"{}/webtoon/list?titleId={}&sortOrder=DESC&page={}",
+				BASE_URL, manga_id, page
+			)
 		};
 
 		let html = match request(&url).html() {
