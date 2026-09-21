@@ -99,7 +99,7 @@ pub fn extract_chapter_number(title: &str, fallback_no: f32) -> f32 {
 
 /// Parses "25.05.26" or "2025.05.26" date into approximate Unix epoch seconds
 pub fn parse_korean_date(date_str: &str) -> f64 {
-	let trimmed = date_str.trim();
+	let trimmed = date_str.trim().trim_end_matches('.');
 	let parts: Vec<&str> = trimmed.split('.').collect();
 	if parts.len() == 3 {
 		let raw_year: i64 = parts[0].parse().unwrap_or(0);

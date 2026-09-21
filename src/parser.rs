@@ -17,7 +17,10 @@ pub fn parse_manga_list(filters: Vec<Filter>, _page: i32) -> Result<MangaPageRes
 		let html = request(&url).html()?;
 
 		let mut mangas: Vec<Manga> = Vec::new();
-		for item in html.select("a[href*=\"/webtoon/list?titleId=\"]").array() {
+		for item in html
+			.select("a[href*=\"/webtoon/list?titleId=\"], a[href*=\"/bestChallenge/list?titleId=\"]")
+			.array()
+		{
 			let node = match item.as_node() {
 				Ok(n) => n,
 				Err(_) => continue,
@@ -38,12 +41,18 @@ pub fn parse_manga_list(filters: Vec<Filter>, _page: i32) -> Result<MangaPageRes
 			let cover = node.select("img").attr("src").read();
 			let author = node.select(".desc, .author").text().read();
 
+			let full_url = if href.starts_with("http") {
+				href
+			} else {
+				format!("{}{}", BASE_URL, href)
+			};
+
 			mangas.push(Manga {
 				id,
 				cover,
 				title,
 				author,
-				url: format!("{}{}", BASE_URL, href),
+				url: full_url,
 				viewer: MangaViewer::Scroll,
 				..Default::default()
 			});
@@ -85,12 +94,18 @@ fn parse_weekday_list(week: &str) -> Result<MangaPageResult> {
 		let cover = node.select("img").attr("src").read();
 		let author = node.select(".desc, .author").text().read();
 
+		let full_url = if href.starts_with("http") {
+			href
+		} else {
+			format!("{}{}", BASE_URL, href)
+		};
+
 		mangas.push(Manga {
 			id,
 			cover,
 			title,
 			author,
-			url: format!("{}{}", BASE_URL, href),
+			url: full_url,
 			viewer: MangaViewer::Scroll,
 			..Default::default()
 		});
@@ -129,12 +144,18 @@ fn parse_finish_list(page: i32) -> Result<MangaPageResult> {
 		let cover = node.select("img").attr("src").read();
 		let author = node.select(".desc, .author").text().read();
 
+		let full_url = if href.starts_with("http") {
+			href
+		} else {
+			format!("{}{}", BASE_URL, href)
+		};
+
 		mangas.push(Manga {
 			id,
 			cover,
 			title,
 			author,
-			url: format!("{}{}", BASE_URL, href),
+			url: full_url,
 			viewer: MangaViewer::Scroll,
 			..Default::default()
 		});
@@ -166,7 +187,10 @@ fn parse_best_challenge_list(page: i32) -> Result<MangaPageResult> {
 	let html = request(&url).html()?;
 
 	let mut mangas: Vec<Manga> = Vec::new();
-	for item in html.select("a[href*=\"/bestChallenge/list?titleId=\"]").array() {
+	for item in html
+		.select("a[href*=\"/bestChallenge/list?titleId=\"]")
+		.array()
+	{
 		let node = match item.as_node() {
 			Ok(n) => n,
 			Err(_) => continue,
@@ -187,12 +211,18 @@ fn parse_best_challenge_list(page: i32) -> Result<MangaPageResult> {
 		let cover = node.select("img").attr("src").read();
 		let author = node.select(".desc, .author").text().read();
 
+		let full_url = if href.starts_with("http") {
+			href
+		} else {
+			format!("{}{}", BASE_URL, href)
+		};
+
 		mangas.push(Manga {
 			id,
 			cover,
 			title,
 			author,
-			url: format!("{}{}", BASE_URL, href),
+			url: full_url,
 			viewer: MangaViewer::Scroll,
 			..Default::default()
 		});
@@ -262,7 +292,7 @@ pub fn parse_manga_details(manga_id: String) -> Result<Manga> {
 		.read();
 
 	let mut categories: Vec<String> = Vec::new();
-	for genre in html.select(".genre, .tag_item, .sub_info span").array() {
+	for genre in html.select(".genre dd span, .genre dd li, .tag_item").array() {
 		if let Ok(genre_node) = genre.as_node() {
 			let g_text = genre_node.text().read();
 			let trimmed = g_text.trim();
@@ -272,10 +302,13 @@ pub fn parse_manga_details(manga_id: String) -> Result<Manga> {
 		}
 	}
 
-	let page_text = html.text().read();
-	let status = if page_text.contains("완결") {
+	let status_text = html
+		.select(".week_day .list_detail, .detail .week_day")
+		.text()
+		.read();
+	let status = if status_text.contains("완결") {
 		MangaStatus::Completed
-	} else if page_text.contains("휴재") {
+	} else if status_text.contains("휴재") {
 		MangaStatus::Hiatus
 	} else {
 		MangaStatus::Ongoing
@@ -400,7 +433,8 @@ pub fn parse_page_list(manga_id: String, chapter_id: String) -> Result<Vec<Page>
 		img_nodes = html.select("div.wt_viewer img, #toon_layer img").array();
 	}
 
-	for (index, item) in img_nodes.into_iter().enumerate() {
+	let mut page_index = 0;
+	for item in img_nodes {
 		let node = match item.as_node() {
 			Ok(n) => n,
 			Err(_) => continue,
@@ -415,10 +449,11 @@ pub fn parse_page_list(manga_id: String, chapter_id: String) -> Result<Vec<Page>
 		}
 
 		pages.push(Page {
-			index: index as i32,
+			index: page_index,
 			url: img_url,
 			..Default::default()
 		});
+		page_index += 1;
 	}
 
 	Ok(pages)
@@ -434,16 +469,14 @@ pub fn modify_image_request(request: Request) {
 /// Handles deep linking for comic.naver.com URLs
 pub fn handle_url(url: String) -> Result<DeepLink> {
 	let title_id = get_title_id(&url);
-	if !title_id.is_empty() {
-		let manga = parse_manga_details(title_id)?;
-		Ok(DeepLink {
-			manga: Some(manga),
-			chapter: None,
-		})
+	let manga = if !title_id.is_empty() {
+		parse_manga_details(title_id).ok()
 	} else {
-		Ok(DeepLink {
-			manga: None,
-			chapter: None,
-		})
-	}
+		None
+	};
+
+	Ok(DeepLink {
+		manga,
+		chapter: None,
+	})
 }
