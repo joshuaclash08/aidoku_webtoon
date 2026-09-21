@@ -40,13 +40,18 @@ pub fn get_title_id(url: &str) -> String {
 
 /// Extracts episode sequence number 'no' from a viewer or detail URL
 pub fn get_chapter_id(url: &str) -> String {
-	if let Some(pos) = url.find("no=") {
-		let after = &url[pos + 3..];
-		let no_str = after.split('&').next().unwrap_or(after);
-		String::from(no_str)
-	} else {
-		String::new()
+	if !url.contains("detail?") {
+		return String::new();
 	}
+	let query = url.split('?').nth(1).unwrap_or("");
+	for param in query.split('&') {
+		let clean = param.trim_start_matches("amp;");
+		if let Some(val) = clean.strip_prefix("no=") {
+			let clean_val = val.split('#').next().unwrap_or(val);
+			return String::from(clean_val);
+		}
+	}
+	String::new()
 }
 
 /// Returns full list URL for a manga

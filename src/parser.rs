@@ -352,7 +352,7 @@ pub fn parse_chapter_list(manga_id: String) -> Result<Vec<Chapter>> {
 			Err(_) => break,
 		};
 
-		let ep_links = html.select("a[href*=\"no=\"]").array();
+		let ep_links = html.select("a[href*=\"detail?\"]").array();
 		if ep_links.is_empty() {
 			break;
 		}
@@ -364,6 +364,9 @@ pub fn parse_chapter_list(manga_id: String) -> Result<Vec<Chapter>> {
 				Err(_) => continue,
 			};
 			let href = node.attr("href").read();
+			if !href.contains("detail?") {
+				continue;
+			}
 			let chapter_id = get_chapter_id(&href);
 			if chapter_id.is_empty() {
 				continue;
