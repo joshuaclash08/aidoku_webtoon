@@ -11,5 +11,20 @@
 				"default": true
 			}
 		]
+	},
+	{
+		"type": "group",
+		"title": "네이버 계정 (19세 성인 인증)",
+		"items": [
+			{
+				"type": "login",
+				"key": "login",
+				"notification": "login",
+				"method": "web",
+				"title": "네이버 로그인",
+				"url": "https://nid.naver.com/nidlogin.login",
+				"refreshes": ["listings"]
+			}
+		]
 	}
 ]

@@ -1,26 +1,29 @@
 use aidoku::{
-	helpers::uri::encode_uri_component,
-	prelude::format,
-	std::defaults::defaults_get,
-	std::net::Request,
-	std::{String, Vec},
-	Filter, FilterType,
+	alloc::{format, String, Vec},
+	imports::{
+		defaults::defaults_get,
+		error::Result,
+		net::Request,
+	},
 };
 
 pub const BASE_URL: &str = "https://m.comic.naver.com";
 
-/// User-Agent for mobile requests
 pub fn get_user_agent() -> String {
 	String::from(
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 	)
 }
 
-/// Request wrapper with User-Agent and Referer headers
-pub fn request(url: &str) -> Request {
-	Request::get(url)
+/// Request wrapper with User-Agent, Referer, and automatic Cookie injection
+pub fn request(url: &str) -> Result<Request> {
+	let mut req = Request::get(url)?
 		.header("Referer", "https://comic.naver.com/")
-		.header("User-Agent", &get_user_agent())
+		.header("User-Agent", &get_user_agent());
+	if let Some(cookie_str) = crate::auth::get_cookie_header() {
+		req = req.header("Cookie", &cookie_str);
+	}
+	Ok(req)
 }
 
 /// Extracts titleId from a given webtoon URL
@@ -78,11 +81,9 @@ pub fn get_chapter_url(chapter_id: &str, manga_id: &str) -> String {
 	}
 }
 
-/// Extracts numeric chapter value from title like "14화 단원 요약" or "2부 8화 생존자"
-/// Falls back to the URL's 'no' parameter if no number found.
+/// Extracts numeric chapter value from title
 pub fn extract_chapter_number(title: &str, fallback_no: f32) -> f32 {
-	// Look for pattern ending with '화'
-	if let Some(hwa_idx) = title.find("화") {
+	if let Some(hwa_idx) = title.find('화') {
 		let before = &title[..hwa_idx];
 		let mut num_str = String::new();
 		for c in before.chars().rev() {
@@ -102,17 +103,16 @@ pub fn extract_chapter_number(title: &str, fallback_no: f32) -> f32 {
 	fallback_no
 }
 
-/// Parses "25.05.26" or "2025.05.26" date into approximate Unix epoch seconds
-pub fn parse_korean_date(date_str: &str) -> f64 {
+/// Parses Korean date string "YY.MM.DD" into unix timestamp (seconds)
+pub fn parse_korean_date(date_str: &str) -> Option<i64> {
 	let trimmed = date_str.trim().trim_end_matches('.');
 	let parts: Vec<&str> = trimmed.split('.').collect();
 	if parts.len() == 3 {
-		let raw_year: i64 = parts[0].parse().unwrap_or(0);
+		let raw_year: i64 = parts[0].parse().ok()?;
 		let year: i64 = if raw_year < 100 { 2000 + raw_year } else { raw_year };
-		let month: i64 = parts[1].parse().unwrap_or(1);
-		let day: i64 = parts[2].parse().unwrap_or(1);
+		let month: i64 = parts[1].parse().ok()?;
+		let day: i64 = parts[2].parse().ok()?;
 
-		// Days from year 1970 to given year (approximate leap years)
 		let mut days = (year - 1970) * 365 + (year - 1969) / 4;
 		let days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 		for m in 0..(month - 1) as usize {
@@ -120,44 +120,18 @@ pub fn parse_korean_date(date_str: &str) -> f64 {
 				days += days_in_month[m];
 			}
 		}
-		// Leap year correction if past Feb
 		if month > 2 && (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) {
 			days += 1;
 		}
 		days += day - 1;
 
-		(days * 86400) as f64
+		Some(days * 86400)
 	} else {
-		-1.0
+		None
 	}
-}
-
-/// Returns the search status as a boolean and the search string if there is one
-pub fn check_for_search(filters: Vec<Filter>) -> (String, bool) {
-	let mut search_string = String::new();
-	let mut search = false;
-
-	for filter in filters {
-		match filter.kind {
-			FilterType::Title => {
-				if let Ok(filter_value) = filter.value.as_string() {
-					search_string.push_str(
-						encode_uri_component(filter_value.read().to_lowercase()).as_str(),
-					);
-					search = true;
-					break;
-				}
-			}
-			_ => continue,
-		}
-	}
-	(search_string, search)
 }
 
 /// Check setting for best challenge
 pub fn show_best_challenge() -> bool {
-	defaults_get("showBestChallenge")
-		.ok()
-		.and_then(|v| v.as_bool().ok())
-		.unwrap_or(true)
+	defaults_get::<bool>("showBestChallenge").unwrap_or(true)
 }

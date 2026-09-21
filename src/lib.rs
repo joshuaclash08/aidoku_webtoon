@@ -1,46 +1,85 @@
 #![no_std]
+
 use aidoku::{
-	error::Result,
-	prelude::*,
-	std::net::Request,
-	std::{String, Vec},
-	Chapter, DeepLink, Filter, Listing, Manga, MangaPageResult, Page,
+	alloc::{String, Vec},
+	imports::error::Result,
+	imports::net::Request,
+	register_source, Chapter, DeepLinkHandler, DeepLinkResult, FilterValue, HashMap,
+	ImageRequestProvider, Listing, ListingProvider, Manga, MangaPageResult, NotificationHandler,
+	Page, PageContext, Source, WebLoginHandler,
 };
 
+mod auth;
 mod helper;
 mod parser;
 
-#[get_manga_list]
-fn get_manga_list(filters: Vec<Filter>, page: i32) -> Result<MangaPageResult> {
-	parser::parse_manga_list(filters, page)
+pub struct WebtoonKR;
+
+impl Source for WebtoonKR {
+	fn new() -> Self {
+		Self
+	}
+
+	fn get_search_manga_list(
+		&self,
+		query: Option<String>,
+		page: i32,
+		filters: Vec<FilterValue>,
+	) -> Result<MangaPageResult> {
+		parser::parse_search_manga_list(query, page, filters)
+	}
+
+	fn get_manga_update(
+		&self,
+		manga: Manga,
+		needs_details: bool,
+		needs_chapters: bool,
+	) -> Result<Manga> {
+		parser::parse_manga_update(manga, needs_details, needs_chapters)
+	}
+
+	fn get_page_list(&self, manga: Manga, chapter: Chapter) -> Result<Vec<Page>> {
+		parser::parse_page_list(&manga.key, &chapter.key)
+	}
 }
 
-#[get_manga_listing]
-fn get_manga_listing(listing: Listing, page: i32) -> Result<MangaPageResult> {
-	parser::parse_manga_listing(listing, page)
+impl ListingProvider for WebtoonKR {
+	fn get_manga_list(&self, listing: Listing, page: i32) -> Result<MangaPageResult> {
+		parser::parse_manga_listing(listing, page)
+	}
 }
 
-#[get_manga_details]
-fn get_manga_details(manga_id: String) -> Result<Manga> {
-	parser::parse_manga_details(manga_id)
+impl ImageRequestProvider for WebtoonKR {
+	fn get_image_request(&self, url: String, context: Option<PageContext>) -> Result<Request> {
+		parser::parse_image_request(url, context)
+	}
 }
 
-#[get_chapter_list]
-fn get_chapter_list(manga_id: String) -> Result<Vec<Chapter>> {
-	parser::parse_chapter_list(manga_id)
+impl DeepLinkHandler for WebtoonKR {
+	fn handle_deep_link(&self, url: String) -> Result<Option<DeepLinkResult>> {
+		parser::parse_deep_link(url)
+	}
 }
 
-#[get_page_list]
-fn get_page_list(manga_id: String, chapter_id: String) -> Result<Vec<Page>> {
-	parser::parse_page_list(manga_id, chapter_id)
+impl WebLoginHandler for WebtoonKR {
+	fn handle_web_login(&self, _key: String, cookies: HashMap<String, String>) -> Result<bool> {
+		auth::handle_login(cookies)
+	}
 }
 
-#[modify_image_request]
-fn modify_image_request(request: Request) {
-	parser::modify_image_request(request);
+impl NotificationHandler for WebtoonKR {
+	fn handle_notification(&self, notification: String) {
+		if notification == "logout" {
+			auth::logout();
+		}
+	}
 }
 
-#[handle_url]
-pub fn handle_url(url: String) -> Result<DeepLink> {
-	parser::handle_url(url)
-}
+register_source!(
+	WebtoonKR,
+	ListingProvider,
+	ImageRequestProvider,
+	DeepLinkHandler,
+	WebLoginHandler,
+	NotificationHandler
+);
